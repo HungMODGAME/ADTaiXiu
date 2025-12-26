@@ -1,0 +1,163 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hệ Thống Tạo Giftcode</title>
+    <style>
+        :root { --gold: #f1c40f; --bg: #0d0d0d; --card: #1a1a1a; --green: #2ecc71; --red: #e74c3c; }
+        body { background: var(--bg); color: white; font-family: 'Segoe UI', sans-serif; display: flex; justify-content: center; padding: 20px; }
+        .admin-card { background: var(--card); padding: 30px; border-radius: 15px; width: 100%; max-width: 450px; border: 1px solid #333; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        h2 { color: var(--gold); text-align: center; margin-bottom: 25px; text-transform: uppercase; letter-spacing: 2px; }
+        
+        .input-group { margin-bottom: 15px; }
+        label { display: block; margin-bottom: 5px; color: #aaa; font-size: 0.9rem; }
+        input { width: 100%; padding: 12px; background: #000; border: 1px solid #444; color: #fff; border-radius: 8px; font-size: 1rem; box-sizing: border-box; }
+        input:focus { border-color: var(--gold); outline: none; }
+        
+        .btn-create { width: 100%; padding: 15px; background: var(--gold); border: none; border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px; transition: 0.3s; text-transform: uppercase; }
+        .btn-create:hover { background: #d4ac0d; transform: translateY(-2px); }
+
+        .code-list { margin-top: 30px; border-top: 1px solid #333; padding-top: 20px; }
+        .list-title { color: #666; text-align: center; font-size: 0.9rem; margin-bottom: 15px; }
+        
+        .code-item { background: #222; padding: 12px 15px; border-radius: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; border: 1px solid #333; }
+        .code-info { display: flex; flex-direction: column; gap: 4px; flex: 1; }
+        .code-text { font-family: monospace; font-size: 1.1rem; color: var(--gold); font-weight: bold; }
+        .code-sub { font-size: 0.75rem; color: #888; }
+        
+        .action-btns { display: flex; gap: 8px; }
+        .btn-copy, .btn-delete { border: none; padding: 8px 10px; border-radius: 6px; cursor: pointer; font-size: 0.75rem; transition: 0.2s; font-weight: bold; }
+        
+        .btn-copy { background: #333; color: #fff; }
+        .btn-copy:hover { background: var(--green); }
+        .btn-copy.copied { background: var(--green); }
+        
+        .btn-delete { background: #333; color: #aaa; }
+        .btn-delete:hover { background: var(--red); color: white; }
+    </style>
+</head>
+<body>
+
+<div class="admin-card">
+    <h2>Quản Lý Giftcode</h2>
+    
+    <div class="input-group">
+        <label>Mã Giftcode</label>
+        <input type="text" id="gc-code" placeholder="Ví dụ: QUATANG88">
+    </div>
+
+    <div class="input-group">
+        <label>Số lượng thiết bị tối đa</label>
+        <input type="number" id="gc-limit" placeholder="Số người có thể nhập...">
+    </div>
+
+    <div class="input-group">
+        <label>Giá trị tiền (VNĐ)</label>
+        <input type="text" id="gc-value" placeholder="10.000" oninput="formatCurrency(this)">
+    </div>
+
+    <button class="btn-create" onclick="generateGiftcode()">XÁC NHẬN TẠO MÃ</button>
+
+    <div class="code-list">
+        <p class="list-title">DANH SÁCH MÃ ĐANG HOẠT ĐỘNG</p>
+        <div id="list-container"></div>
+    </div>
+</div>
+
+<script>
+    function formatCurrency(input) {
+        let value = input.value.replace(/\D/g, "");
+        value = value.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+        input.value = value;
+    }
+
+    function generateGiftcode() {
+        const code = document.getElementById('gc-code').value.trim().toUpperCase();
+        const limit = parseInt(document.getElementById('gc-limit').value);
+        const valueStr = document.getElementById('gc-value').value.replace(/\./g, "");
+        const value = parseInt(valueStr);
+
+        if(!code || !limit || isNaN(value)) {
+            alert("Vui lòng điền đầy đủ thông tin!");
+            return;
+        }
+
+        let giftcodes = JSON.parse(localStorage.getItem('v6_giftcodes') || '{}');
+
+        if(giftcodes[code]) {
+            alert("Mã này đã tồn tại trên hệ thống!");
+            return;
+        }
+
+        giftcodes[code] = {
+            value: value,
+            limit: limit,
+            usedCount: 0,
+            usersUsed: [] 
+        };
+
+        localStorage.setItem('v6_giftcodes', JSON.stringify(giftcodes));
+        
+        document.getElementById('gc-code').value = "";
+        document.getElementById('gc-limit').value = "";
+        document.getElementById('gc-value').value = "";
+        
+        renderCodes();
+    }
+
+    function copyToClipboard(text, btn) {
+        navigator.clipboard.writeText(text).then(() => {
+            const originalText = btn.innerText;
+            btn.innerText = "OK";
+            btn.classList.add('copied');
+            setTimeout(() => {
+                btn.innerText = originalText;
+                btn.classList.remove('copied');
+            }, 1000);
+        });
+    }
+
+    // Hàm xóa mã Giftcode
+    function deleteCode(code) {
+        if(confirm("Bạn có chắc chắn muốn xóa mã: " + code + "?")) {
+            let giftcodes = JSON.parse(localStorage.getItem('v6_giftcodes') || '{}');
+            delete giftcodes[code];
+            localStorage.setItem('v6_giftcodes', JSON.stringify(giftcodes));
+            renderCodes();
+        }
+    }
+
+    function renderCodes() {
+        const giftcodes = JSON.parse(localStorage.getItem('v6_giftcodes') || '{}');
+        const container = document.getElementById('list-container');
+        container.innerHTML = "";
+        
+        const keys = Object.keys(giftcodes).reverse();
+        
+        if(keys.length === 0) {
+            container.innerHTML = '<p style="text-align:center; color:#444; font-size:0.8rem;">Chưa có mã nào được tạo</p>';
+            return;
+        }
+
+        keys.forEach(key => {
+            const item = giftcodes[key];
+            container.innerHTML += `
+                <div class="code-item">
+                    <div class="code-info">
+                        <span class="code-text">${key}</span>
+                        <span class="code-sub">Tiền: ${item.value.toLocaleString()}đ | ${item.usedCount}/${item.limit} lượt</span>
+                    </div>
+                    <div class="action-btns">
+                        <button class="btn-copy" onclick="copyToClipboard('${key}', this)">COPY</button>
+                        <button class="btn-delete" onclick="deleteCode('${key}')">XÓA</button>
+                    </div>
+                </div>
+            `;
+        });
+    }
+
+    window.onload = renderCodes;
+</script>
+</body>
+</html>
